@@ -6,10 +6,10 @@
 
 ## 운영 설정
 
-- 프로젝트: [coupang-instagram-trend](https://railway.com/project/6054c6a3-14ae-420a-8383-7ea946a06388)
+- 프로젝트: [yojeumtem](https://railway.com/project/6054c6a3-14ae-420a-8383-7ea946a06388)
 - 환경: `production`
 - 서비스: `shopping-trend-collector`
-- 소스: `dev-93/coupang-instagram-trend`, `main`
+- 소스: `dev-93/yojeumtem`, `main`
 
 | 설정 | 값 |
 | --- | --- |

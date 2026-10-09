@@ -9,7 +9,7 @@ Mac의 launchd 예약 작업은 매일 18:00에 Codex CLI를 실행한다. 당�
 
 ## Mac 예약 등록과 확인
 
-- 프로젝트: `/Users/taenam/business/coupang-instagram-trend`. `.env`와 전송 이력을 함께 쓰는 기존 로컬 프로젝트를 사용한다.
+- 프로젝트: `/Users/taenam/business/yojeumtem`. `.env`와 전송 이력을 함께 쓰는 기존 로컬 프로젝트를 사용한다.
 - 시간: 매일 **18:00**, Mac 시간대 Asia/Seoul. 17:00 수집 기록을 읽고 해석·전송을 시작하며 조사 후 알림이 도착한다.
 - 실행: `launchd → caffeinate → Node 실행 코드 → codex exec → JSON 검증 → Telegram`.
 

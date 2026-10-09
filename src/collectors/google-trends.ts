@@ -27,7 +27,7 @@ export function parseGoogleRss(xml: string): Trend[] {
 
 export async function collectGoogleTrends(): Promise<Trend[]> {
   const response = await fetch(GOOGLE_RSS_URL, {
-    headers: { 'User-Agent': 'coupang-instagram-trend/0.1 (+RSS research)' },
+    headers: { 'User-Agent': 'yojeumtem/0.1 (+RSS research)' },
     signal: AbortSignal.timeout(15000)
   });
   if (!response.ok) throw new Error(`Google Trends RSS 요청 실패: HTTP ${response.status}`);
