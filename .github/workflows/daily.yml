@@ -25,13 +25,5 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
-      - name: Save trend report to Notion
-        env:
-          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
-          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
-          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-        run: |
-          test -n "$NAVER_CLIENT_ID"
-          test -n "$NAVER_CLIENT_SECRET"
-          test -n "$NOTION_TOKEN"
-          npm run daily
+      - name: Preview product candidates (no external writes)
+        run: npm run daily -- --preview

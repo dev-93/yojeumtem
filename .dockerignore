@@ -8,3 +8,6 @@
 !src/**
 !test/
 !test/**
+
+!data/
+!data/products.json

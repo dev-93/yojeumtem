@@ -14,5 +14,6 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/package.json /app/package-lock.json ./
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/src ./src
+COPY --chown=node:node data/products.json ./data/products.json
 USER node
 CMD ["timeout", "--kill-after=10s", "600s", "npm", "run", "daily"]

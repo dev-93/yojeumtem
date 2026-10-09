@@ -1,3 +1,5 @@
+> 2026-10-09 구현 변경(미배포): daily는 Google RSS·고정 네이버 조회 대신 data/products.json의 상품 관측을 사용한다. 빈 입력에서는 후보 0개이며 AI 추천을 생략한다. 아래 과거 수집 방식·배포 기록은 이력이다. Notion 쓰기는 Railway 단일 실행자로 운영하고 다른 환경과 겹쳐 실행하지 않는다. 상품 입력·보존·중복 정책은 README.md 기준이다.
+
 # Railway 수집 배치
 
 수집만 Railway에서 실행한다. AI 해석과 Telegram 전송은 기존 Mac `launchd`의 매일 18:00 작업을 유지하며 유료 AI API를 연결하지 않는다. 기존 Notion 실행 기록·후보 DB를 그대로 사용한다.

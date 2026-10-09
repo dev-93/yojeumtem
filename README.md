@@ -1,98 +1,56 @@
-# 쿠팡 파트너스 × Instagram 쇼핑 주제 탐지기
+# 요즘템 · 구체 상품 콘텐츠 후보
 
-한국 Google Trends 급상승 RSS와 NAVER API HUB 쇼핑인사이트를 **서로 독립적으로 조회**합니다. Google은 급상승 검색어 중 상품 관련 키워드를 찾고, 네이버는 별도로 관리하는 상품 키워드의 쇼핑 클릭 추이를 확인합니다. 조회 후 같은 키워드만 합쳐 점수화합니다. 실행 개요와 TOP 10은 [Notion 실행 기록 DB](https://app.notion.com/p/862d974cfc5e4237bf8b912526205faf)에 저장하고, 우선 확인할 TOP 3는 [별도 후보 DB](https://app.notion.com/p/c8b5882a0efe465580822bc19cfc7d38)에 키워드별 행으로 저장합니다. 후보가 부족하면 실제 개수만 표시합니다. 새 Markdown/JSON 파일은 생성하지 않습니다.
-
-Codex 예약 작업이 최신 후보와 실제 소비자 경험을 읽어 콘텐츠 실험안 초안을 만들 수 있습니다. 상품 확인·파트너스 링크 생성·Instagram 게시는 사람이 합니다. AI API는 사용하지 않습니다.
-
-## 준비
-
-Node.js 22 이상이 필요합니다.
+검색량 기반 고정 키워드 후보 대신 **확인한 상품 원문 → 소개 이유·제작 근거 검사 → 상품 중복 방지 → 하루 최대 3개** 흐름을 사용합니다. Google RSS·고정 네이버 조회는 daily에서 제거했습니다. 유료 AI API는 사용하지 않습니다.
 
 ```bash
-npm install
+npm run daily -- --preview                 # 외부 호출·쓰기 없음
+npm run daily -- --input data/products.json --preview
+npm run daily                             # 기존 Notion DB에 기록
+npm run check
+npm test
 ```
 
-`.env`가 아직 없을 때만 `cp .env.example .env`로 만듭니다. 이미 네이버 키가 들어 있다면 파일을 덮어쓰지 말고 `NOTION_TOKEN` 한 줄을 추가하세요.
+Node.js 22+와 기존 NOTION_TOKEN이 필요합니다. 미리보기에는 토큰이 필요 없습니다. `data/products.json`은 빈 입력으로 시작합니다. **URL만 넣으면 자동으로 상품을 읽거나 신상품을 발굴하는 기능은 아직 없습니다.** 확인한 상품 정보를 아래 형식으로 입력하세요. 운영자 우선순위 순서에서 조건을 통과한 후보를 선정합니다.
 
-네이버 클라우드 플랫폼의 **NAVER API HUB**에서 쇼핑인사이트를 사용할 Application을 등록하고 Client ID/Secret을 `.env`에 입력합니다. Notion 내부 연동 토큰도 같은 파일의 `NOTION_TOKEN`에 입력하고, [실행 기록 DB](https://app.notion.com/p/862d974cfc5e4237bf8b912526205faf)를 해당 연동에 공유합니다. 쿠팡 파트너스 계정과는 별도입니다. 기존 `developers.naver.com` 키는 API HUB에서 사용할 수 없습니다. [네이버 API HUB 등록 방법](https://api.ncloud-docs.com/docs/naver-api-hub-overview), [키워드별 트렌드 API](https://api.ncloud-docs.com/docs/naver-api-hub-shopping-insight-keywords), [이관 안내](https://developers.naver.com/notice/article/32530).
-
-```dotenv
-NAVER_CLIENT_ID=발급한_ID
-NAVER_CLIENT_SECRET=발급한_SECRET
-NOTION_TOKEN=Notion_연동_토큰
+```json
+{
+  "schemaVersion": 1,
+  "products": [{
+    "name": "브랜드와 모델이 포함된 구체 상품명",
+    "brand": "브랜드",
+    "model": "정확한 모델·세대·용량·구성",
+    "category": "생활/건강",
+    "source": "official",
+    "sourceUrl": "https://example.com/product",
+    "observedAt": "2026-10-09T10:00:00+09:00",
+    "verifiedAt": "2026-10-09T10:00:00+09:00",
+    "publishedAt": null,
+    "whyNow": "원문으로 확인한 최근 소개 이유",
+    "distinctive": "구체적으로 다른 특징",
+    "firstScene": "실제로 만들 수 있는 첫 화면",
+    "visualBasis": "보유 제품 또는 사용 허락을 확인한 이미지 등",
+    "purchaseUrl": "https://example.com/buy",
+    "purchaseStatus": "available"
+  }]
+}
 ```
 
-`.env`는 Git에서 제외됩니다. 키를 채팅이나 이슈에 붙여 넣지 마세요. 이 프로젝트는 다른 프로젝트의 `.env`를 자동으로 읽지 않습니다.
+예제는 실제 후보가 아닙니다. source는 official/social, 판매 상태는 available/preorder/funding입니다. 관측·확인 시각은 시간대 포함이며 미래 값은 제외합니다. 확인 후 14일이 넘으면 재확인해야 합니다. 최초 관측을 출시일로 바꾸지 않습니다. HTTPS 공개 URL만 입력하고 비밀값·개인정보는 넣지 않습니다.
 
-`problem-radar`와 같은 NAVER 환경변수 이름 및 API HUB 인증 헤더를 사용합니다. 이전에 안내한 `NAVER_API_HUB_CLIENT_ID`/`NAVER_API_HUB_CLIENT_SECRET`도 호환을 위해 인식합니다.
+## 보존·중복·선정
 
-네이버는 [`src/config/naver-keywords.ts`](src/config/naver-keywords.ts)의 상품 키워드를 Google 결과와 무관하게 매번 조회합니다. 처음에는 `양념 소불고기`, `한우 국거리` 등 6개를 예시 겸 감시 목록으로 넣었습니다. 실제 촬영하거나 소개할 상품에 맞춰 **키워드·카테고리 코드·적합성 점수**를 이 파일에서 수정하세요. 이 목록은 자동 발견한 유행 상품이 아닙니다. 네이버 키워드별 트렌드 API는 조회할 키워드와 쇼핑 카테고리 코드를 요청에 반드시 넣어야 합니다.
+- 실행당 입력 최대 20개·60KB. 입력 원본 전체는 제외 전 그대로 기존 Notion 실행 페이지 코드 블록에 저장합니다. 사이트 HTTP 응답을 보존한 것은 아닙니다. 과거 수집 원본은 복원하지 못합니다.
+- 상품은 브랜드+모델을 정규화한 키로 식별합니다. 동일 제품의 판매처 차이는 합치고 세대·용량·구성은 모델에 명시합니다. 상품명 유사도로 다른 상품을 임의 병합하지 않습니다.
+- 기존 후보 본문의 상품 키를 읽어 이미 저장한 상품은 제외합니다. 일부 후보 저장 후 실패해도 재실행에서 성공분은 다시 만들지 않습니다. 조회 실패 시 쓰기를 중단합니다.
+- 한국시간 하루 최대 3개, 실행당 카테고리 최대 1개. 일반 키워드·필수 근거 누락·오래된 확인은 제외합니다. 점수로 빈자리를 채우지 않습니다. 총점은 미평가로 비워 둡니다.
+- 하루 상한은 새 상품 후보 행 기준입니다. 동일 카테고리 제한은 실행 단위이며 최근 7일 다양성은 아직 구현하지 않았습니다.
+- 기존 키워드 후보·사용자 메모·검토상태를 변경하지 않습니다. 원본과 관측 날짜·출처는 본문에, 관계·속성명은 기존 형식으로 유지합니다. 신규 후보가 없으면 실행 기록만 생성합니다.
+- Notion에 원자적 유일 키가 없어 **Railway를 단일 쓰기 실행자로 사용**합니다. 다른 환경의 daily 쓰기를 겹쳐 실행하지 마세요. 미리보기는 기존 Notion 중복·당일 누적 수를 검사하지 않습니다.
 
-`npm run verify:naver`에서 HTTP 401이 나오면 [API HUB Application 관리](https://guide.ncloud-docs.com/docs/apihub-application)의 API 목록에서 **Data Lab → 쇼핑 인사이트**가 선택됐는지 확인하세요. 검색 API가 200이어도 쇼핑인사이트 권한은 별도입니다. 기존 Application을 수정하거나 쇼핑인사이트를 선택한 새 Application의 키를 이 프로젝트 `.env`에 넣으면 됩니다.
+## 예약·AI
 
-## 실행
+Railway 17:00 daily, Mac 18:00 Codex 해석·Telegram 명령은 유지합니다. 최신 TOP 본문과 최종 후보 수가 실제 신규 상품만 포함하므로 후보 0개에서는 AI 호출과 추천을 생략합니다. 현재 콘텐츠 해석은 소비자 불편 근거도 확인하며 입력의 화제성·판매 주장을 자동 사실로 취급하지 않습니다.
 
-```bash
-npm run daily   # 한 번 실행
-npm run dev     # 개발 중 파일 변경 시 재실행
-npm run verify:naver # 키워드 1개로 네이버 인증·응답 확인
-npm run briefing:read # 최신 Notion 실행과 처리 이력 읽기
-npm run telegram:test         # 비서 봇으로 실패 알림 연결 테스트
-npm run telegram:test:content # 콘텐츠 봇 연결 테스트
-npm run check   # TypeScript 검사
-npm test        # RSS 파싱·필터·쇼핑 추이 계산 점검
-```
+배포 이미지에 data/products.json을 포함해야 합니다. 빈 입력을 배포하면 후보가 0개인 상태가 계속됩니다. 공개 상품 정보만 커밋하거나 별도 --input 파일을 운영합니다. 공식 신제품 피드와 허용된 SNS 연동은 후속 작업이며 아직 추가하지 않았습니다.
 
-날짜와 실행시각은 한국시간 기준입니다. `npm run daily`를 실행할 때마다 실행 기록 DB에 새 행이 추가됩니다. 예약·수동 실행 기록을 각각 보존하며, 이전 행을 덮어쓰지 않습니다. 행의 `쇼핑 후보` 수는 네이버 감시 목록 중 유효한 추이를 받은 키워드 수입니다. 본문에는 Google 수집·상품 후보·미분류와 네이버 독립 조회·추이 확보 건수를 따로 표시합니다. **미분류 수**는 Google 키워드가 상품 카테고리 규칙과 매칭되지 않아 사람이 상품 연결 가능성을 살펴볼 항목의 수입니다. TOP 3가 있으면 후보 DB에 각 1행을 추가합니다. 후보의 `실행기록`과 실행 기록의 `우선 확인 후보`는 양방향 Notion 관계 속성이므로 어느 쪽에서도 연결된 행을 열 수 있습니다. 원본 JSON 코드 블록은 저장하지 않습니다. Notion 저장에 실패하면 명령이 오류로 종료하며, 로컬 보고서로 대체하지 않습니다. `output/`의 기존 파일은 이전 버전 실행 기록이며 새 파일은 생성하지 않습니다.
-
-Notion DB는 이미 생성되어 있으며 매 실행마다 재생성하지 않습니다. DB 스키마와 행은 Notion에 보관하고, 코드의 [`src/report/notion.ts`](src/report/notion.ts)는 두 데이터 소스 ID와 사용하는 속성명·타입을 정의합니다. Notion에서 속성을 바꾸면 이 파일과 테스트도 함께 변경해야 합니다. 첫 실행 전에 연동에 **실행 기록 DB와 후보 DB 모두** 공유되어 있어야 합니다.
-
-TOP 3 후보 DB의 표 컬럼은 `키워드`, `발견시각`, `예상 카테고리`, `총점`, `검토상태`, `실행기록`만 사용합니다. `예상 카테고리`는 규칙이 제안한 가설이며 확정 상품 분류가 아닙니다. 실행 내 TOP 1~3 순위와 ‘네이버에서 이 상품을 눌러본 관심 흐름’의 최근 3일/앞선 7일 비교는 후보 페이지 본문에 남깁니다. 사람이 쓰는 검토 메모도 페이지 본문의 `검토 메모` 섹션에 적습니다. 숫자 변화율은 판매량·절대 클릭 수 증가율이 아닙니다.
-
-## 하루 한 번 자동 실행
-
-Railway의 `shopping-trend-collector`가 한국시간 **매일 17:00에 한 번** `npm run daily`를 실행합니다. Mac이 꺼져 있어도 수집합니다. UTC 기준 cron은 `0 8 * * *`입니다. 실행 후 종료하며 최대 10분으로 제한합니다. 배포할 때 Docker 빌드에서 타입 검사와 테스트를 통과해야 합니다. 실제 서비스·비밀 변수·실행 확인 방법은 [Railway 운영 기록](docs/railway.md)에 있습니다.
-
-수집용 `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `NOTION_TOKEN`은 Railway 서비스의 보호된 Variables에 등록합니다. `.env`와 `.runtime/`는 Git과 Docker 이미지에 포함하지 않습니다. AI API나 Telegram 토큰은 이 수집 서비스에 필요하지 않습니다. Railway도 분 단위 정시 실행을 보장하지 않으며 몇 분 지연될 수 있습니다. [Railway 공식 cron 문서](https://docs.railway.com/cron-jobs)
-
-GitHub [Actions 워크플로](.github/workflows/daily.yml)는 중복 예약을 끄고 수동 실행만 유지합니다. 복구가 필요하면 Actions의 **Run workflow**를 사용할 수 있으며, 이때 수집용 키 3개는 기존 Repository secrets를 사용합니다. 수동·배포 실행도 새 Notion 행을 만들 수 있습니다.
-
-## 데이터와 점수의 의미
-
-- Google: [Trending Now 한국 RSS](https://trends.google.com/trending/rss?geo=KR)의 최근 항목과 `approx_traffic` 표시값을 사용합니다. RSS는 전체 급상승 목록이 아니며 현재 응답은 소수의 최근 항목만 포함합니다. 관심이 높아도 제품과 무관한 뉴스가 많을 수 있습니다.
-- 네이버: API HUB `POST /shopping/v1/category/keywords`에 별도 상품 감시 목록을 보냅니다. Google 결과가 0개여도 조회합니다. 같은 쇼핑 분야에서 최대 5개 키워드를 한 번에 요청합니다. 조회 종료일은 어제, 기간은 최근 10일입니다. 최근 3일의 평균을 앞선 7일 평균과 비교합니다. 값은 조회 구간 내 최대 클릭을 100으로 정규화한 **상대 비율**입니다. 절대 검색량·판매량이나 서로 다른 요청의 규모 비교에 사용하면 안 됩니다.
-- 결합: Google 상품 후보와 네이버에서 추이를 확보한 감시 키워드를 합칩니다. 공백·대소문자를 정규화한 이름이 같을 때만 두 신호를 한 후보에 붙입니다. 한쪽에만 있는 후보도 남깁니다. 네이버 감시 목록과 정확히 일치한 Google 미분류 항목은 해당 상품 카테고리로 옮깁니다.
-- 분류: Google에는 `src/config/rules.ts`의 카테고리 키워드와 제외 문맥 규칙을 적용합니다. 매칭되지 않은 주제는 **미분류 · 사람 확인**에 남깁니다. 낯선 키워드 하나마다 규칙을 추가할 필요는 없으며, 같은 유효 패턴이 반복될 때만 넓은 규칙을 추가합니다. 휴리스틱이므로 오탐과 누락을 검토해야 합니다.
-- 점수: `src/config/rules.ts`에서 가중치, 기간, 최저 점수를 바꿀 수 있습니다. `trendScore`는 RSS 표시 트래픽과 신선도, `shoppingScore`는 같은 키워드의 기간 내 상대값 변화, 나머지 두 점수는 카테고리별 가설값입니다. 없는 출처의 점수는 `미수집`으로 표시하고, 있는 점수의 가중치만 재정규화해 0~100 총점을 계산합니다. 출처 수가 다른 후보의 총점은 같은 근거량을 뜻하지 않으므로 상세 신호를 함께 확인하세요. 네이버 일별 데이터가 빠지거나 전부 0인 감시 키워드는 네이버 후보에서 제외하되 Google 후보가 있으면 유지합니다.
-
-Google 후보가 없어도 네이버 감시 목록은 조회합니다. 두 수집은 동시에 실행하며, 한쪽이 실패하면 다른 쪽의 결과와 실패 이유를 Notion에 기록하고 명령은 오류 코드로 끝납니다. 둘 다 실패하면 보고서를 만들지 않습니다. 검증되지 않은 점수를 넣거나 10개를 채우기 위해 데이터를 만들어내지 않습니다.
-
-## Codex 해석과 Telegram
-
-로컬 `.env`에 콘텐츠 실험안용 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`와 실패 알림용 `ASSISTANT_TELEGRAM_BOT_TOKEN`을 설정합니다. 수집 실패와 예약 실패 알림은 비서 봇으로 보냅니다. `ASSISTANT_TELEGRAM_CHAT_ID`는 선택 항목이며, 비우면 `TELEGRAM_CHAT_ID`를 사용합니다. 비서 봇 연결 확인은 `npm run telegram:test`, 콘텐츠 봇 연결 확인은 `npm run telegram:test:content`를 사용합니다. 토큰은 Mac 로컬 `.env`에만 두고 Git이나 로그에 남기지 않습니다.
-
-다른 프로젝트에서 재사용할 수 있는 메시지 레이아웃과 전송 예시는 [Telegram 메시지 포맷 가이드](docs/telegram-format.md)에 있습니다.
-
-[콘텐츠 실험안 운영 지침](docs/content-briefing.md)에 따라 Mac의 `launchd`가 **매일 18:00**에 Codex CLI를 실행합니다. Codex가 당일 17:00 이후의 수집 기록과 웹의 실제 사용 경험을 읽고 **대상·불편·근거·영상 장면·상품 연결·구매 이유·측정**을 최대 1개 실험안으로 정리합니다. 수집이 아직 끝나지 않았으면 과거 기록을 오늘 새 후보로 보내지 않습니다. 새 실험안이 없으면 알림을 생략하며, 같은 기록과 같은 실험의 반복 전송을 막습니다. 전송 메시지는 항상 `[쿠팡]`으로 시작합니다.
-
-일반 Node.js 수집기가 AI 가설을 만드는 것은 아닙니다. Codex CLI가 ChatGPT 계정으로 로그인되어 있어야 하며 **Mac이 켜져 있고 로그인·인터넷 연결이 유지되어야** 합니다. Codex 앱이나 이 대화는 열어둘 필요가 없습니다. 잠자기 중 놓친 예약은 깨어날 때 실행되지만 당일 데이터가 없으면 추천을 보류합니다. Railway 수집은 Mac 상태와 별개로 유지됩니다. 해석 작업은 당일 Notion 기록과 출처 실패 경고를 확인합니다. 유료 AI API를 추가하지 않으며 Codex 구독 사용량 제한은 적용됩니다. 새 Notion DB는 만들지 않습니다. `.runtime/`에는 실험안·처리 이력·예약 상태만 남기고 Git에서 제외합니다.
-
-```bash
-codex login status       # Logged in using ChatGPT 확인
-npm run schedule:install # Mac 시간대 Asia/Seoul에서 매일 18:00 예약 등록
-npm run schedule:status  # 실제 등록과 최근 실행 결과 확인
-npm run schedule:remove # 로컬 해석·Telegram 예약 해제 (Railway 수집은 별도)
-```
-
-예약은 `~/Library/LaunchAgents/com.taenam.coupang-content-briefing.plist`에 등록됩니다. 프로젝트나 Node/Codex 설치 경로가 바뀌면 다시 설치합니다. 실행 중 오류가 나도 다음날 예약은 유지됩니다. Codex는 읽기 전용으로 조사하며, JSON 형식·최신 기록·중복 여부를 기존 코드가 확인한 뒤 전송합니다. 낮에 `npm run briefing:scheduled`로 점검하면 알림 없이 종료합니다. 실행 상태는 `.runtime/scheduler-status.json`, 운영 로그는 `.runtime/scheduler.log`에 남습니다. 앱 내장 예약을 동시에 등록하지 않습니다.
-
-수집 결과가 26시간보다 오래됐거나 Notion 조회가 실패하면 추천을 보류합니다. 전송 응답을 확인하지 못했으면 중복 방지를 위해 자동 재전송하지 않습니다. 데이터가 충분해도 실제 콘텐츠 반응이나 구매 전환을 보장하지는 않습니다.
-
-## 매일의 사용
-
-1. `npm run daily` 실행 후 [TOP 3 후보 DB](https://app.notion.com/p/c8b5882a0efe465580822bc19cfc7d38)를 확인합니다. 비어 있으면 실행 기록의 **미분류 · 사람 확인**을 살핍니다.
-2. 각 키워드의 실제 관심 이유, 쿠팡 상품 연결의 자연스러움, Instagram 정보성 콘텐츠 가치와 광고 표기 필요성을 사람이 검토합니다.
-3. Codex 예약 작업을 등록했다면 Telegram의 실험안을 읽고 직접 상품·시연 내용을 확인합니다. 수동으로 하려면 `npm run briefing:read`를 실행해 같은 지침으로 Codex에 분석을 요청할 수 있습니다.
-4. 게시 후 저장·링크 클릭·파트너스 전환을 기록해 규칙이 쓸모 있는지 판단합니다.
-
-Google RSS는 뉴스 편향이 있으므로 상품 감시 목록은 실제 Instagram 실험에 맞춰 조정해야 합니다. 감시 목록의 항목은 매번 조회되는 고정 입력이며, 총점이 높아도 실제 상승세가 아닐 수 있습니다. 후보의 최근·이전 쇼핑 클릭 추이와 변화율을 확인한 뒤 콘텐츠를 고르세요. Instagram 자동 게시는 범위 밖입니다.
+기존 명령 `briefing:read`, `briefing:send`, `briefing:scheduled`, `schedule:status`와 Telegram 봇 설정은 유지합니다. 운영 문서는 [Railway](docs/railway.md), [콘텐츠 해석](docs/content-briefing.md)을 참고하세요. 자동 Instagram 게시·제휴 링크 생성은 범위 밖입니다.
