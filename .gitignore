@@ -4,3 +4,7 @@
 .runtime/
 node_modules/
 dist/
+
+# 교차 검토는 최종 보고서만 버전 관리
+research/2026-11-10-network-review/*
+!research/2026-11-10-network-review/REPORT.md
