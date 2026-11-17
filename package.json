@@ -1,0 +1,20 @@
+{
+  "name": "yojeumtem-threads-sync",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.17"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "doctor": "node --experimental-strip-types src/cli.ts doctor",
+    "setup": "node --experimental-strip-types src/cli.ts setup",
+    "sync": "node --experimental-strip-types src/cli.ts sync",
+    "identify": "node --experimental-strip-types src/identify.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  }
+}
