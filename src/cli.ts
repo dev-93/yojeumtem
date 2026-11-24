@@ -103,9 +103,14 @@ export async function run(command:string, args:string[]=[], requestFn:typeof req
     }
     if(!dry) {
       if(c.summary) {
-        ranked.sort((a,b)=>b.views-a.views);
-        const best=ranked[0];
-         await notion(`blocks/${c.summary}`,'PATCH',{paragraph:{rich_text:rich(`Threads 수집 ${saved}개 · 리포스트 제외 ${reposts}개 · 성과 미확인/일부 누락 ${failed}개. ${best?`이번 수집 범위 조회 최다: 「${best.title}」 ${best.views}회.`:''}\n기준 ${new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST. 각 글의 누적값이며 노출 기간은 다릅니다.`)}});
+        const summary=await notion(`blocks/${c.summary}`);
+        if(summary.archived || summary.in_trash) {
+          console.warn('요약 갱신 생략: 설정된 Notion 요약 블록이 휴지통에 있습니다. 게시글 동기화는 완료하며 삭제된 블록은 복원하지 않습니다. 요약을 사용하려면 NOTION_SUMMARY_BLOCK_ID를 확인하세요.');
+        } else {
+          ranked.sort((a,b)=>b.views-a.views);
+          const best=ranked[0];
+          await notion(`blocks/${c.summary}`,'PATCH',{paragraph:{rich_text:rich(`Threads 수집 ${saved}개 · 리포스트 제외 ${reposts}개 · 성과 미확인/일부 누락 ${failed}개. ${best?`이번 수집 범위 조회 최다: 「${best.title}」 ${best.views}회.`:''}\n기준 ${new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})} KST. 각 글의 누적값이며 노출 기간은 다릅니다.`)}});
+        }
       }
       const next={completedAt:new Date().toISOString(),fullAt:full?new Date().toISOString():state.fullAt};
       await (await open(`${dir}/state.tmp`,'w',0o600)).close();

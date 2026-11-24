@@ -1,18 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { run } from '../src/cli.ts';
 import { metrics, sourceMarker } from '../src/core.ts';
 import type { request } from '../src/http.ts';
+import { ApiError } from '../src/http.ts';
 
 const userId='test-user';
 const post={id:'post-1',text:'테스트 Threads 본문 😀',timestamp:'2026-11-23T00:00:00Z',permalink:'https://threads.example/post-1',media_type:'TEXT_POST'};
 const repost={id:'repost-1',text:'리포스트는 제외',timestamp:'2026-11-22T00:00:00Z',media_type:'REPOST_FACADE'};
 const values=metrics.map(name=>({name,values:[{value:name==='views'?60:1}]}));
 
-function mockApi(seed?:{id:string;blocks:any[]}, options:{childDatabaseTitle?:string;dataSource?:boolean;schema?:Record<string,any>}={}) {
+function mockApi(seed?:{id:string;blocks:any[]}, options:{childDatabaseTitle?:string;dataSource?:boolean;schema?:Record<string,any>;summaryArchived?:boolean;summaryInTrash?:boolean}={}) {
   const pages=new Map<string,{id:string;properties:any;blocks:any[]}>();
   if(seed) pages.set(post.id,{id:seed.id,properties:{'제휴링크':{relation:[{id:'affiliate-1'}]},'제작 방식':{select:{name:'수동'}}},blocks:seed.blocks});
   const calls:Array<{url:string;method:string;body:any}> = [];
@@ -58,8 +59,12 @@ function mockApi(seed?:{id:string;blocks:any[]}, options:{childDatabaseTitle?:st
       return {results:page?.blocks ?? []};
     }
     const blockMatch=pathname.match(/^\/v1\/blocks\/([^/]+)$/);
+    if(blockMatch?.[1]==='summary' && method==='GET') return {id:'summary',type:'paragraph',archived:options.summaryArchived ?? false,in_trash:options.summaryInTrash ?? false};
     if(blockMatch && method==='PATCH') {
-      if(blockMatch[1]==='summary') {summaryUpdates.push(parsedBody);return {id:'summary'};}
+      if(blockMatch[1]==='summary') {
+        if(options.summaryArchived || options.summaryInTrash) throw new ApiError(400);
+        summaryUpdates.push(parsedBody);return {id:'summary'};
+      }
       for(const page of pages.values()) {
         const block=page.blocks.find(x=>x.id===blockMatch[1]);
         if(block) {block.paragraph=parsedBody.paragraph;return {id:block.id};}
@@ -170,4 +175,19 @@ test('doctor rejects a content DB whose Threads channel option is missing',async
   schema['채널'].select.options=schema['채널'].select.options.filter((option:any)=>option.name!=='Threads');
   const mock=mockApi(undefined,{dataSource:true,schema});
   await assert.rejects(run('doctor',[],mock.fakeRequest),/채널: Select 옵션 Threads 누락/);
+}));
+
+test('sync completes and saves state without updating or restoring a trashed optional summary',async(t)=>withConfig(async()=>{
+  const warning=t.mock.method(console,'warn',()=>{});
+  for(const options of [{summaryArchived:true},{summaryInTrash:true}]) {
+    const mock=mockApi(undefined,options);
+    await run('sync',['--full'],mock.fakeRequest);
+    assert.equal(mock.pages.size,1,'Content rows must still be saved');
+    assert.equal(mock.summaryUpdates.length,0);
+    assert.equal(mock.calls.some(call=>call.url.endsWith('/blocks/summary') && call.method==='PATCH'),false,'Do not modify or restore the deleted summary');
+    const state=JSON.parse(await readFile(join(process.env.THREADS_SYNC_STATE_DIR!,'state.json'),'utf8'));
+    assert.ok(state.completedAt,'Successful content sync must advance its state');
+  }
+  assert.equal(warning.mock.callCount(),2);
+  assert.match(warning.mock.calls[0]!.arguments[0],/요약 갱신 생략.*휴지통/);
 }));
