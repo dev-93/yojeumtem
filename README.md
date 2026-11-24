@@ -25,8 +25,10 @@ experiments/    실험별 문안·이미지·제작 파일
 docs/           기술 구현 계획
 ```
 
-- [Threads 게시글·성과 수집 개발계획서](docs/threads-data-plan.md): 게시글 원문과 성과를 Notion으로 수집하는 구현 제안. 아직 API 연동·DB 생성·배포를 완료한 상태는 아닙니다.
-- [Threads 수집 실행 안내](docs/threads-sync-usage.md): TypeScript 수집기 인증 설정·수동 실행·검증 방법. 실제 인증과 정기 배포는 별도로 확인해야 합니다.
+- [Threads 게시글·성과 수집 개발계획서](docs/threads-data-plan.md): Threads 게시물 원문과 성과 수집의 설계 기록.
+- [Threads 수집 실행 안내](docs/threads-sync-usage.md): 기존 Data Source ID를 이용해 통합 콘텐츠 DB에 Threads만 동기화하는 실행·검증 방법.
+
+Threads 수집기는 기존 콘텐츠 DB/Data Source ID를 재사용합니다. `Threads ID`로 Upsert하고 `채널=Threads`와 성과를 갱신하며, 제휴링크 및 수동 입력 속성은 payload에 포함하지 않습니다. 인스타 릴스·네이버 클립·네이버 블로그는 수동 등록 대상이고, 리포스트는 수집하지 않습니다.
 
 실험 파일의 작성·보관 방법은 [experiments/README.md](experiments/README.md)를 따릅니다. 상세 조사와 사업 판단은 Notion에 기록하고 제작 파일에서 해당 기록을 연결합니다.
 
